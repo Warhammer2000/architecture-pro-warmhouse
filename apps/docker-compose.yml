@@ -11,7 +11,7 @@ services:
 
   app:
     build:
-      context: ./smart_home
+      context: ./SmartHome.Api
       dockerfile: Dockerfile
     container_name: smarthome-app
     depends_on:
@@ -22,6 +22,7 @@ services:
     environment:
       - DATABASE_URL=postgres://postgres:postgres@postgres:5432/smarthome
       - TEMPERATURE_API_URL=http://temperature-api:8081
+      - ASPNETCORE_ENVIRONMENT=Production
     ports:
       - "8080:8080"
     restart: unless-stopped
