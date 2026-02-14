@@ -1,0 +1,173 @@
+@startuml C4_Code_DeviceService_Classes
+
+skinparam class {
+    BackgroundColor #FEFECE
+    BorderColor #A80036
+}
+
+title Device Service - Диаграмма классов (Domain Layer)
+
+package "Domain.Entities" {
+    
+    class Device {
+        +Id : Guid
+        +Name : string
+        +Type : DeviceType
+        +Protocol : string
+        +ConnectionString : string
+        +Status : DeviceStatus
+        +HomeId : Guid
+        +CreatedAt : DateTime
+        +LastSeenAt : DateTime
+        --
+        +UpdateStatus(status : DeviceStatus) : void
+        +Execute(command : Command) : void
+        +IsOnline() : bool
+    }
+    
+    enum DeviceType {
+        THERMOSTAT
+        LIGHT
+        GATE
+        CAMERA
+        SENSOR
+    }
+    
+    enum DeviceStatus {
+        ONLINE
+        OFFLINE
+        ERROR
+        MAINTENANCE
+    }
+    
+    class DeviceState {
+        +DeviceId : Guid
+        +Properties : Dictionary<string, object>
+        +UpdatedAt : DateTime
+        --
+        +GetProperty<T>(key : string) : T
+        +SetProperty(key : string, value : object) : void
+    }
+    
+    class Command {
+        +Id : Guid
+        +DeviceId : Guid
+        +Action : string
+        +Parameters : Dictionary<string, object>
+        +CreatedAt : DateTime
+        +Status : CommandStatus
+    }
+    
+    enum CommandStatus {
+        PENDING
+        SENT
+        ACKNOWLEDGED
+        FAILED
+        TIMEOUT
+    }
+}
+
+package "Domain.Services" {
+    
+    interface IDeviceManager {
+        +RegisterDevice(request) : Task<Device>
+        +ExecuteCommand(deviceId, command) : Task<bool>
+        +GetState(deviceId) : Task<DeviceState>
+        +UpdateState(deviceId, state) : Task
+    }
+    
+    class DeviceManager {
+        -_repository : IDeviceRepository
+        -_adapterFactory : IProtocolAdapterFactory
+        -_stateManager : IStateManager
+        -_eventPublisher : IEventPublisher
+        --
+        +RegisterDevice(request) : Task<Device>
+        +ExecuteCommand(deviceId, command) : Task<bool>
+        +GetState(deviceId) : Task<DeviceState>
+        +UpdateState(deviceId, state) : Task
+    }
+}
+
+package "Domain.Interfaces" {
+    
+    interface IDeviceRepository {
+        +GetById(id : Guid) : Task<Device>
+        +GetByHomeId(homeId : Guid) : Task<IEnumerable<Device>>
+        +Add(device : Device) : Task
+        +Update(device : Device) : Task
+        +Delete(id : Guid) : Task
+    }
+    
+    interface IProtocolAdapter {
+        +Protocol : string
+        +SendCommand(device, command) : Task<bool>
+        +CheckConnection(device) : Task<bool>
+    }
+    
+    interface IProtocolAdapterFactory {
+        +Create(protocol : string) : IProtocolAdapter
+    }
+    
+    interface IStateManager {
+        +GetState(deviceId : Guid) : Task<DeviceState>
+        +SetState(deviceId : Guid, state : DeviceState) : Task
+        +InvalidateState(deviceId : Guid) : Task
+    }
+    
+    interface IEventPublisher {
+        +Publish<T>(event : T) : Task
+    }
+}
+
+package "Domain.Events" {
+    
+    interface IDomainEvent {
+        +EventId : Guid
+        +OccurredAt : DateTime
+    }
+    
+    class DeviceRegisteredEvent {
+        +EventId : Guid
+        +OccurredAt : DateTime
+        +DeviceId : Guid
+        +DeviceName : string
+        +Type : DeviceType
+        +HomeId : Guid
+    }
+    
+    class DeviceStateChangedEvent {
+        +EventId : Guid
+        +OccurredAt : DateTime
+        +DeviceId : Guid
+        +OldState : DeviceState
+        +NewState : DeviceState
+    }
+    
+    class CommandExecutedEvent {
+        +EventId : Guid
+        +OccurredAt : DateTime
+        +DeviceId : Guid
+        +Command : Command
+        +Success : bool
+    }
+}
+
+' Relationships
+Device "1" -- "1" DeviceState : has >
+Device "1" -- "*" Command : receives >
+Device --> DeviceType
+Device --> DeviceStatus
+Command --> CommandStatus
+
+DeviceManager ..|> IDeviceManager
+DeviceManager --> IDeviceRepository : uses
+DeviceManager --> IProtocolAdapterFactory : uses
+DeviceManager --> IStateManager : uses
+DeviceManager --> IEventPublisher : uses
+
+DeviceRegisteredEvent ..|> IDomainEvent
+DeviceStateChangedEvent ..|> IDomainEvent
+CommandExecutedEvent ..|> IDomainEvent
+
+@enduml

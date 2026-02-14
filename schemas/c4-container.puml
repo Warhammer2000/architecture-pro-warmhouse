@@ -1,0 +1,104 @@
+@startuml C4_Container_SmartHome_ToBe
+!define RECTANGLE class
+
+skinparam rectangle {
+    BackgroundColor<<person>> #08427B
+    FontColor<<person>> white
+    BackgroundColor<<system>> #1168BD
+    FontColor<<system>> white
+    BackgroundColor<<container>> #438DD5
+    FontColor<<container>> white
+    BackgroundColor<<database>> #438DD5
+    FontColor<<database>> white
+    BackgroundColor<<queue>> #438DD5
+    FontColor<<queue>> white
+    BackgroundColor<<external>> #999999
+    FontColor<<external>> white
+}
+
+title Диаграмма контейнеров "Тёплый дом" (To-Be)
+
+rectangle "Пользователь\n[Person]\n\nВладелец дома" <<person>> as user
+rectangle "Администратор\n[Person]\n\nУправляет платформой" <<person>> as admin
+
+package "Экосистема Тёплый дом" {
+    
+    rectangle "API Gateway\n[Container: Kong/YARP]\n\nЕдиная точка входа,\nмаршрутизация, auth" <<container>> as gateway
+    
+    rectangle "Web Application\n[Container: React]\n\nSPA для управления\nумным домом" <<container>> as webapp
+    
+    rectangle "Mobile App\n[Container: React Native]\n\nМобильное приложение" <<container>> as mobile
+    
+    package "Core Services" {
+        rectangle "Device Service\n[Container: .NET 10]\n\nРегистрация устройств,\nпротоколы, команды" <<container>> as device_svc
+        
+        rectangle "Automation Service\n[Container: .NET 10]\n\nСценарии, правила,\nтриггеры" <<container>> as automation_svc
+    }
+    
+    package "Supporting Services" {
+        rectangle "Telemetry Service\n[Container: Go]\n\nСбор телеметрии" <<container>> as telemetry_svc
+        
+        rectangle "Heating Service\n[Container: .NET 10]\n\nУправление отоплением" <<container>> as heating_svc
+        
+        rectangle "Lighting Service\n[Container: Python]\n\nУправление светом" <<container>> as lighting_svc
+        
+        rectangle "Gate Service\n[Container: .NET 10]\n\nУправление воротами" <<container>> as gate_svc
+    }
+    
+    package "Platform Services" {
+        rectangle "Identity Service\n[Container: .NET 10]\n\nАутентификация, JWT" <<container>> as identity_svc
+        
+        rectangle "Billing Service\n[Container: .NET 10]\n\nПодписки, платежи" <<container>> as billing_svc
+        
+        rectangle "Notification Service\n[Container: Node.js]\n\nPush, Email, SMS" <<container>> as notification_svc
+    }
+    
+    rectangle "Message Broker\n[Container: RabbitMQ]\n\nАсинхронные события" <<queue>> as broker
+    
+    database "Device DB\n[PostgreSQL]" <<database>> as device_db
+    database "Telemetry DB\n[TimescaleDB]" <<database>> as telemetry_db
+    database "User DB\n[PostgreSQL]" <<database>> as user_db
+    database "Cache\n[Redis]" <<database>> as cache
+}
+
+rectangle "IoT устройства\n[External System]\n\nДатчики, реле, камеры" <<external>> as iot
+rectangle "Payment Gateway\n[External System]\n\nStripe/ЮKassa" <<external>> as payment
+rectangle "Push Services\n[External System]\n\nFirebase/APNs" <<external>> as push
+
+' User interactions
+user --> webapp : HTTPS
+user --> mobile : HTTPS
+admin --> webapp : HTTPS
+
+' Frontend to Gateway
+webapp --> gateway : REST API
+mobile --> gateway : REST API
+
+' Gateway to Services
+gateway --> identity_svc : gRPC (auth)
+gateway --> device_svc : REST
+gateway --> automation_svc : REST
+gateway --> telemetry_svc : REST
+gateway --> heating_svc : REST
+gateway --> billing_svc : REST
+
+' Service to Broker
+device_svc --> broker : публикует события
+automation_svc --> broker : подписка
+telemetry_svc --> broker : публикует
+notification_svc --> broker : подписка
+
+' Service to Database
+device_svc --> device_db
+device_svc --> cache
+telemetry_svc --> telemetry_db
+identity_svc --> user_db
+identity_svc --> cache
+
+' External
+device_svc --> iot : MQTT/CoAP
+iot --> telemetry_svc : MQTT
+billing_svc --> payment : HTTPS
+notification_svc --> push : HTTPS
+
+@enduml

@@ -1,0 +1,66 @@
+@startuml C4_Component_TelemetryService
+
+skinparam rectangle {
+    BackgroundColor<<component>> #85BBF0
+    FontColor<<component>> black
+    BackgroundColor<<database>> #438DD5
+    FontColor<<database>> white
+    BackgroundColor<<external>> #999999
+    FontColor<<external>> white
+}
+
+title Диаграмма компонентов: Telemetry Service
+
+package "Telemetry Service" {
+    
+    rectangle "Telemetry API\n[Component: Go Gin]\n\nREST API для запроса\nтелеметрии" <<component>> as api
+    
+    rectangle "Telemetry gRPC\n[Component: gRPC Service]\n\nВнутренний API для\nдругих сервисов" <<component>> as grpc
+    
+    rectangle "MQTT Listener\n[Component: MQTT Client]\n\nПриём данных\nс IoT устройств" <<component>> as mqtt
+    
+    rectangle "Data Processor\n[Component: Pipeline]\n\nВалидация, нормализация,\nагрегация" <<component>> as processor
+    
+    rectangle "Alert Checker\n[Component: Worker]\n\nПроверка пороговых\nзначений" <<component>> as alert
+    
+    rectangle "TimeSeries Writer\n[Component: Batch Writer]\n\nЗапись в TimescaleDB" <<component>> as writer
+    
+    rectangle "Query Service\n[Component: Handler]\n\nЗапросы истории\nи агрегатов" <<component>> as query
+    
+    rectangle "Event Publisher\n[Component: AMQP]\n\nПубликация событий" <<component>> as publisher
+    
+    database "TimescaleDB\n[PostgreSQL + TimescaleDB]\n\nВременные ряды" <<database>> as timescale
+    database "Hot Cache\n[Redis]\n\nПоследние значения" <<database>> as cache
+}
+
+rectangle "API Gateway\n[External]" <<external>> as gateway
+rectangle "Automation Service\n[External]" <<external>> as automation
+rectangle "Message Broker\n[RabbitMQ]" <<external>> as broker
+rectangle "IoT Devices\n[External]" <<external>> as iot
+
+' Data ingestion
+iot --> mqtt : MQTT telemetry
+mqtt --> processor : Raw data
+
+' Processing pipeline
+processor --> writer : Validated data
+processor --> cache : Latest values
+processor --> publisher : TelemetryReceived
+processor --> alert : Check thresholds
+
+' Alerts
+alert --> publisher : AlertTriggered
+publisher --> broker : Events
+
+' Data storage
+writer --> timescale : Batch INSERT
+
+' Query path
+gateway --> api : HTTP/REST
+automation --> grpc : gRPC
+api --> query : Queries
+grpc --> query : Queries
+query --> timescale : SELECT
+query --> cache : GET latest
+
+@enduml

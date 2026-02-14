@@ -1,0 +1,96 @@
+@startuml C4_Code_Sequence_ExecuteCommand
+
+title Sequence Diagram: Выполнение команды "Включить отопление"
+
+actor User
+participant "Mobile App" as App
+participant "API Gateway" as Gateway
+participant "Device Service" as DeviceAPI
+participant "Command Handler" as Handler
+participant "Device Manager" as Manager
+participant "Protocol Adapter" as Adapter
+participant "State Manager" as State
+participant "Event Publisher" as Publisher
+participant "Message Broker" as Broker
+participant "Automation Service" as Automation
+database "Redis Cache" as Cache
+database "PostgreSQL" as DB
+participant "IoT Device" as Device
+
+User -> App: Нажимает "Включить отопление"
+activate App
+
+App -> Gateway: POST /api/devices/{id}/commands\n{action: "turn_on", params: {temp: 22}}
+activate Gateway
+
+Gateway -> Gateway: Проверка JWT токена
+Gateway -> DeviceAPI: Forward request
+activate DeviceAPI
+
+DeviceAPI -> Handler: ExecuteCommandRequest
+activate Handler
+
+Handler -> DB: Получить устройство по ID
+DB --> Handler: Device entity
+
+Handler -> Manager: ExecuteCommand(device, command)
+activate Manager
+
+Manager -> State: GetState(deviceId)
+activate State
+State -> Cache: GET device:{id}:state
+Cache --> State: Current state
+State --> Manager: DeviceState
+deactivate State
+
+Manager -> Adapter: SendCommand(device, command)
+activate Adapter
+
+Adapter -> Device: MQTT: home/{homeId}/device/{deviceId}/cmd\n{action: "turn_on", temp: 22}
+activate Device
+Device --> Adapter: MQTT: ACK
+deactivate Device
+
+Adapter --> Manager: Success
+deactivate Adapter
+
+Manager -> State: SetState(deviceId, newState)
+activate State
+State -> Cache: SET device:{id}:state
+Cache --> State: OK
+deactivate State
+
+Manager -> Publisher: Publish(DeviceStateChangedEvent)
+activate Publisher
+Publisher -> Broker: DeviceStateChangedEvent
+Broker --> Publisher: ACK
+deactivate Publisher
+
+Manager --> Handler: CommandResult(success: true)
+deactivate Manager
+
+Handler -> DB: Сохранить Command с статусом ACKNOWLEDGED
+DB --> Handler: OK
+
+Handler --> DeviceAPI: CommandResponse
+deactivate Handler
+
+DeviceAPI --> Gateway: 200 OK {status: "success"}
+deactivate DeviceAPI
+
+Gateway --> App: 200 OK
+deactivate Gateway
+
+App --> User: UI обновлён: "Отопление включено"
+deactivate App
+
+== Асинхронная обработка события ==
+
+Broker -> Automation: DeviceStateChangedEvent
+activate Automation
+Automation -> Automation: Проверка триггеров\nсценариев автоматизации
+note right: Например, сценарий:\n"Если включено отопление,\nзакрыть окна"
+Automation -> DeviceAPI: ExecuteCommand(windowId, "close")
+deactivate Automation
+
+@enduml

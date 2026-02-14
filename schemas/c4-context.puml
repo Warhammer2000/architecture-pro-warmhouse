@@ -1,0 +1,34 @@
+@startuml C4_Context_SmartHome_AsIs
+
+skinparam rectangle {
+    BackgroundColor<<person>> #08427B
+    FontColor<<person>> white
+    BackgroundColor<<system>> #1168BD
+    FontColor<<system>> white
+    BackgroundColor<<external>> #999999
+    FontColor<<external>> white
+}
+
+title Диаграмма контекста системы "Тёплый дом" (As-Is)
+
+rectangle "Пользователь\n[Person]\n\nВладелец дома,\nуправляет отоплением\nи просматривает температуру" <<person>> as user
+
+rectangle "Администратор\n[Person]\n\nСпециалист по подключению\nсистемы отопления" <<person>> as admin
+
+rectangle "Монолит SmartHome\n[Software System]\n\nУправление отоплением\nи мониторинг температуры\nв домах пользователей" <<system>> as smarthome
+
+rectangle "Датчики температуры\n[External System]\n\nФизические устройства в домах,\nпередающие данные о температуре" <<external>> as sensors
+
+rectangle "Система отопления\n[External System]\n\nФизическое оборудование\nотопления в домах" <<external>> as heating
+
+user --> smarthome : Просматривает температуру,\nуправляет отоплением\n[HTTPS/REST API]
+
+admin --> smarthome : Настраивает\nподключение датчиков\n[HTTPS/REST API]
+
+smarthome --> sensors : Запрашивает данные\nтемпературы\n[HTTP синхронно]
+
+smarthome --> heating : Отправляет команды\nвкл/выкл\n[HTTP синхронно]
+
+sensors --> smarthome : Возвращает показания
+
+@enduml
