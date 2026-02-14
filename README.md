@@ -528,6 +528,8 @@ AS -> AS: Check automation rules
 
 ### 2. ER-диаграмма (PlantUML)
 
+[Исходный код диаграммы (PlantUML)](schemas/er-diagram.puml)
+
 ```plantuml
 @startuml ER_Diagram_SmartHome
 !theme plain
