@@ -1,0 +1,69 @@
+@startuml C4_Component_AutomationService
+
+skinparam rectangle {
+    BackgroundColor<<component>> #85BBF0
+    FontColor<<component>> black
+    BackgroundColor<<database>> #438DD5
+    FontColor<<database>> white
+    BackgroundColor<<external>> #999999
+    FontColor<<external>> white
+}
+
+title Диаграмма компонентов: Automation Service
+
+package "Automation Service" {
+    
+    rectangle "Automation API\n[Component: ASP.NET Controller]\n\nREST API для управления\nсценариями" <<component>> as api
+    
+    rectangle "Scenario Handler\n[Component: MediatR]\n\nCRUD операции\nсо сценариями" <<component>> as scenario_handler
+    
+    rectangle "Rule Engine\n[Component: Domain Service]\n\nДвижок правил\nи условий" <<component>> as rule_engine
+    
+    rectangle "Trigger Processor\n[Component: Background Service]\n\nОбработка триггеров\nи событий" <<component>> as trigger
+    
+    rectangle "Action Executor\n[Component: Strategy Pattern]\n\nВыполнение действий\nсценариев" <<component>> as executor
+    
+    rectangle "Scheduler\n[Component: Hangfire]\n\nПланировщик\nдля расписаний" <<component>> as scheduler
+    
+    rectangle "Event Consumer\n[Component: MassTransit]\n\nПодписка на события\nустройств" <<component>> as consumer
+    
+    rectangle "Device Client\n[Component: gRPC Client]\n\nКлиент для\nDevice Service" <<component>> as device_client
+    
+    rectangle "Scenario Repository\n[Component: Repository]\n\nДоступ к данным" <<component>> as repo
+    
+    database "Automation DB\n[PostgreSQL]" <<database>> as db
+    database "State Cache\n[Redis]" <<database>> as cache
+}
+
+rectangle "API Gateway\n[External]" <<external>> as gateway
+rectangle "Device Service\n[External]" <<external>> as device_svc
+rectangle "Telemetry Service\n[External]" <<external>> as telemetry_svc
+rectangle "Message Broker\n[RabbitMQ]" <<external>> as broker
+
+' API connections
+gateway --> api : HTTP/REST
+api --> scenario_handler : CRUD
+
+' Event-driven flow
+broker --> consumer : DeviceStateChanged\nTelemetryReceived
+consumer --> trigger : Check triggers
+
+' Rule processing
+trigger --> rule_engine : Evaluate
+rule_engine --> telemetry_svc : Get data (gRPC)
+rule_engine --> executor : Execute actions
+
+' Action execution
+executor --> device_client : Commands
+device_client --> device_svc : gRPC
+
+' Scheduling
+scheduler --> trigger : Scheduled triggers
+scenario_handler --> scheduler : Register schedules
+
+' Data access
+scenario_handler --> repo : CRUD
+repo --> db : SQL
+trigger --> cache : State
+
+@enduml
