@@ -1,0 +1,71 @@
+@startuml C4_Component_DeviceService
+
+skinparam rectangle {
+    BackgroundColor<<component>> #85BBF0
+    FontColor<<component>> black
+    BackgroundColor<<database>> #438DD5
+    FontColor<<database>> white
+    BackgroundColor<<external>> #999999
+    FontColor<<external>> white
+}
+
+title Диаграмма компонентов: Device Service
+
+package "Device Service" {
+    
+    rectangle "Device API\n[Component: ASP.NET Controller]\n\nREST API для управления\nустройствами" <<component>> as api
+    
+    rectangle "Device gRPC\n[Component: gRPC Service]\n\nВнутренний API для\nдругих сервисов" <<component>> as grpc
+    
+    rectangle "Command Handler\n[Component: MediatR]\n\nОбработка команд\nк устройствам" <<component>> as cmd_handler
+    
+    rectangle "Query Handler\n[Component: MediatR]\n\nЗапросы состояния\nустройств" <<component>> as query_handler
+    
+    rectangle "Device Manager\n[Component: Domain Service]\n\nБизнес-логика\nуправления устройствами" <<component>> as manager
+    
+    rectangle "Protocol Adapter\n[Component: Adapter Pattern]\n\nАдаптеры для MQTT,\nCoAP, HTTP" <<component>> as adapter
+    
+    rectangle "State Manager\n[Component: State Pattern]\n\nУправление состоянием\nустройств" <<component>> as state
+    
+    rectangle "Event Publisher\n[Component: MassTransit]\n\nПубликация событий\nв Message Broker" <<component>> as publisher
+    
+    rectangle "Device Repository\n[Component: Repository]\n\nДоступ к данным" <<component>> as repo
+    
+    database "Device Database\n[PostgreSQL]" <<database>> as db
+    database "State Cache\n[Redis]" <<database>> as cache
+}
+
+rectangle "API Gateway\n[External]" <<external>> as gateway
+rectangle "Automation Service\n[External]" <<external>> as automation
+rectangle "Message Broker\n[RabbitMQ]" <<external>> as broker
+rectangle "IoT Devices\n[External]" <<external>> as iot
+
+' External connections
+gateway --> api : HTTP/REST
+automation --> grpc : gRPC
+
+' Internal flow - Commands
+api --> cmd_handler : Commands
+grpc --> cmd_handler : Commands
+cmd_handler --> manager : Execute
+manager --> adapter : Send command
+adapter --> iot : MQTT/CoAP
+
+' Internal flow - Queries
+api --> query_handler : Queries
+query_handler --> repo : Read
+query_handler --> state : Get state
+
+' State management
+manager --> state : Update state
+state --> cache : Cache
+state --> publisher : State changed
+
+' Data access
+repo --> db : SQL
+manager --> repo : Save
+
+' Events
+publisher --> broker : DeviceStateChanged
+
+@enduml

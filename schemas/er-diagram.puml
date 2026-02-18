@@ -1,0 +1,72 @@
+@startuml ER_Diagram_SmartHome
+!theme plain
+hide circle
+skinparam linetype ortho
+
+entity "User" as user {
+  *id : UUID
+  --
+  username : text
+  email : text
+  password_hash : text
+  created_at : timestamp
+}
+
+entity "Home" as home {
+  *id : UUID
+  --
+  address : text
+  name : text
+}
+
+entity "UserHome" as userhome {
+  *user_id : UUID <<FK>>
+  *home_id : UUID <<FK>>
+  --
+  role : text
+  joined_at : timestamp
+}
+
+entity "DeviceType" as dtype {
+  *id : UUID
+  --
+  name : text
+  description : text
+}
+
+entity "Device" as device {
+  *id : UUID
+  --
+  *home_id : UUID <<FK>>
+  *type_id : UUID <<FK>>
+  serial_number : text
+  name : text
+  status : text
+  created_at : timestamp
+}
+
+entity "Telemetry" as telemetry {
+  *id : UUID
+  --
+  *device_id : UUID <<FK>>
+  timestamp : timestamp
+  value : double
+  unit : text
+}
+
+entity "Action" as action {
+  *id : UUID
+  --
+  *device_id : UUID <<FK>>
+  command : text
+  payload : jsonb
+  timestamp : timestamp
+}
+
+user ||..o{ userhome : "belongs to"
+home ||..o{ userhome : "has members"
+home ||..o{ device : "contains"
+dtype ||..o{ device : "classifies"
+device ||..o{ telemetry : "generates"
+device ||..o{ action : "executes"
+@enduml
