@@ -12,12 +12,14 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./SmartHome.Api/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - smarthome-network
 
   temperature-api:
     build:
@@ -28,6 +30,8 @@ services:
       - "8081:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
+    networks:
+      - smarthome-network
 
   telemetry-service:
     build:
@@ -38,6 +42,8 @@ services:
       - "8082:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
+    networks:
+      - smarthome-network
 
   device-service:
     build:
@@ -48,6 +54,8 @@ services:
       - "8083:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
+    networks:
+      - smarthome-network
 
   app:
     build:
@@ -60,8 +68,8 @@ services:
       temperature-api:
         condition: service_started
     environment:
-      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/smarthome
-      - TEMPERATURE_API_URL=http://temperature-api:8080
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=smarthome;Username=postgres;Password=postgres
+      - TemperatureApi__BaseUrl=http://temperature-api:8080
       - ASPNETCORE_ENVIRONMENT=Production
     ports:
       - "8080:8080"
